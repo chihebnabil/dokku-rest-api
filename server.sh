@@ -147,22 +147,40 @@ fi
 
 # Function to handle a single connection
 handle_connection() {
+  # Read the complete HTTP request
   local request=""
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    request="$request$line\n"
-    if [[ -z "$line" ]]; then
-      break
+  local line=""
+  local content_length=0
+  
+  # Read headers
+  while IFS= read -r line; do
+    line=${line%$'\r'}
+    [ -z "$line" ] && break
+    request+="$line"$'\n'
+    
+    # Check for Content-Length header
+    if [[ "$line" =~ ^Content-Length:\ ([0-9]+) ]]; then
+      content_length="${BASH_REMATCH[1]}"
     fi
   done
   
+  # Read body if Content-Length is present
+  if [ "$content_length" -gt 0 ]; then
+    read -n "$content_length" -r body
+    request+=$'\n'"$body"
+  fi
+  
+  # Process the request and send response
   echo -e "$request" | handle_request "$request"
 }
 
 # Main server loop
 while true; do
   if [[ "$NC_CMD" == "nc" ]]; then
-    # Use nc (BSD style)
-    echo -e "$(nc -l "$HOST" "$PORT")" | handle_connection
+    # Use nc (BSD style) with proper options
+    nc -l "$HOST" "$PORT" -k | while read -r line; do
+      handle_connection
+    done
   else
     # Use ncat (Nmap style)
     ncat -l "$HOST" "$PORT" --keep-open --sh-exec "handle_connection"
