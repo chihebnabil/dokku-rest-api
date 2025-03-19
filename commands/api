@@ -2,7 +2,7 @@
 # Handles `dokku api:*` commands
 case "$1" in
   api:start)
-    /var/lib/dokku/plugins/dokku-api-plugin/bin/run-api
+    /var/lib/dokku/plugins/enabled/rest-api/bin/run-api
     echo "API started"
     ;;
   api:stop)
