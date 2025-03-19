@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+
+# Make all scripts executable
+chmod +x /var/lib/dokku/plugins/enabled/rest-api/bin/run-api
+chmod +x /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+chmod +x /var/lib/dokku/plugins/enabled/rest-api/commands
+
+# Run the pre-build hook to set up dependencies
+/var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+
+echo "Dokku REST API plugin installed successfully."
+echo "Set your API key with: export DOKKU_API_KEY=\"your-secure-key\""
+echo "Start the API with: dokku api:start"

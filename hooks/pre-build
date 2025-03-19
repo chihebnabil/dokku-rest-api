@@ -1,3 +1,17 @@
 #!/usr/bin/env bash
-# Install Python dependencies
+set -e
+
+# Ensure the log file exists with correct permissions
+if [ ! -f "/var/log/dokku-api.log" ]; then
+    touch /var/log/dokku-api.log
+    chown dokku:dokku /var/log/dokku-api.log
+fi
+
+# Check if pip is installed, if not, install it
+if ! command -v pip3 &> /dev/null; then
+    apt-get update
+    apt-get install -y python3-pip
+fi
+
+# Install Flask
 python3 -m pip install -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt

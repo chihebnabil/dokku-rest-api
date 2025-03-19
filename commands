@@ -1,18 +1,43 @@
 #!/usr/bin/env bash
 # Handles `dokku api:*` commands
+
+check_prerequisites() {
+  # Check if the pre-build script has been run
+  if [ ! -f "/var/log/dokku-api.log" ]; then
+    echo "Setting up dokku-api prerequisites..."
+    /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+  fi
+  
+  # Check if Flask is installed
+  if ! python3 -c "import flask" &> /dev/null; then
+    echo "Installing Flask..."
+    /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+  fi
+}
+
 case "$1" in
   api:start)
+    check_prerequisites
     /var/lib/dokku/plugins/enabled/rest-api/bin/run-api
     echo "API started"
     ;;
   api:stop)
-    pkill -f "python3.*app.py"
+    pkill -f "python3.*app.py" || echo "API was not running"
     echo "API stopped"
     ;;
   api:logs)
-    tail -f /var/log/dokku-api.log
+    if [ ! -f "/var/log/dokku-api.log" ]; then
+      echo "Log file does not exist. Start the API first."
+    else
+      tail -f /var/log/dokku-api.log
+    fi
+    ;;
+  api:setup)
+    echo "Setting up dokku-api..."
+    /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+    echo "Setup completed successfully"
     ;;
   *)
-    echo "Available commands: api:start, api:stop, api:logs"
+    echo "Available commands: api:start, api:stop, api:logs, api:setup"
     ;;
 esac
