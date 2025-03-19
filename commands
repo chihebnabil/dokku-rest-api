@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -eo pipefail
+[[ $DOKKU_TRACE ]] && set -x
+
+PLUGIN_BASE_PATH="$PLUGIN_DIR/enabled/dokku-rest-api"
+PLUGIN_CONFIG_PATH="$DOKKU_LIB_ROOT/config/dokku-rest-api"
+PLUGIN_DATA_PATH="$DOKKU_LIB_ROOT/data/dokku-rest-api"
+PLUGIN_PORT="${DOKKU_REST_API_PORT:-8080}"
+PLUGIN_HOST="${DOKKU_REST_API_HOST:-0.0.0.0}"
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "jq is required for this plugin. Please install it first."
+    exit 1
+fi
+
+# Create necessary directories
+mkdir -p "$PLUGIN_CONFIG_PATH" "$PLUGIN_DATA_PATH"
+
+# Command functions
+cmd_help() {
+  cat <<EOF
+    rest-api:enable, Enable the REST API
+    rest-api:disable, Disable the REST API
+    rest-api:start, Start the REST API server
+    rest-api:stop, Stop the REST API server
+    rest-api:status, Show the status of the REST API server
+    rest-api:set-port <port>, Set the port for the REST API server
+    rest-api:set-host <host>, Set the host for the REST API server
+EOF
+}
+
+cmd_rest_api_enable() {
+  echo "true" > "$PLUGIN_CONFIG_PATH/enabled"
+  echo "REST API enabled. Use 'dokku rest-api:start' to start the server."
+}
+
+cmd_rest_api_disable() {
+  cmd_rest_api_stop
+  echo "false" > "$PLUGIN_CONFIG_PATH/enabled"
+  echo "REST API disabled."
+}
+
+cmd_rest_api_set_port() {
+  local port="$1"
+  
+  if [[ -z "$port" ]]; then
+    echo "Error: Port number is required."
+    exit 1
+  fi
+  
+  if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+    echo "Error: Port must be a number."
+    exit 1
+  fi
+  
+  echo "$port" > "$PLUGIN_CONFIG_PATH/port"
+  echo "REST API port set to $port."
+}
+
+cmd_rest_api_set_host() {
+  local host="$1"
+  
+  if [[ -z "$host" ]]; then
+    echo "Error: Host is required."
+    exit 1
+  fi
+  
+  echo "$host" > "$PLUGIN_CONFIG_PATH/host"
+  echo "REST API host set to $host."
+}
+
+cmd_rest_api_status() {
+  if [[ -f "$PLUGIN_DATA_PATH/pid" ]]; then
+    local pid="$(cat "$PLUGIN_DATA_PATH/pid")"
+    if ps -p "$pid" > /dev/null; then
+      local port="$(cat "$PLUGIN_CONFIG_PATH/port" 2>/dev/null || echo "$PLUGIN_PORT")"
+      local host="$(cat "$PLUGIN_CONFIG_PATH/host" 2>/dev/null || echo "$PLUGIN_HOST")"
+      echo "REST API is running on $host:$port (PID: $pid)"
+      return 0
+    else
+      echo "REST API is not running (stale PID file found, cleaning up)"
+      rm -f "$PLUGIN_DATA_PATH/pid"
+    fi
+  fi
+  echo "REST API is not running"
+  return 1
+}
+
+cmd_rest_api_start() {
+  if [[ -f "$PLUGIN_DATA_PATH/pid" ]]; then
+    local pid="$(cat "$PLUGIN_DATA_PATH/pid")"
+    if ps -p "$pid" > /dev/null; then
+      echo "REST API is already running (PID: $pid)"
+      return 0
+    else
+      rm -f "$PLUGIN_DATA_PATH/pid"
+    fi
+  fi
+  
+  # Check if enabled
+  if [[ ! -f "$PLUGIN_CONFIG_PATH/enabled" ]] || [[ "$(cat "$PLUGIN_CONFIG_PATH/enabled")" != "true" ]]; then
+    echo "REST API is disabled. Enable it first with 'dokku rest-api:enable'."
+    return 1
+  fi
+  
+  local port="$(cat "$PLUGIN_CONFIG_PATH/port" 2>/dev/null || echo "$PLUGIN_PORT")"
+  local host="$(cat "$PLUGIN_CONFIG_PATH/host" 2>/dev/null || echo "$PLUGIN_HOST")"
+  
+  # Start the server in the background
+  nohup bash "$PLUGIN_BASE_PATH/server.sh" "$host" "$port" > "$PLUGIN_DATA_PATH/output.log" 2>&1 &
+  local pid=$!
+  echo $pid > "$PLUGIN_DATA_PATH/pid"
+  
+  echo "REST API server started on $host:$port (PID: $pid)"
+  echo "Log output is being written to $PLUGIN_DATA_PATH/output.log"
+}
+
+cmd_rest_api_stop() {
+  if [[ -f "$PLUGIN_DATA_PATH/pid" ]]; then
+    local pid="$(cat "$PLUGIN_DATA_PATH/pid")"
+    if ps -p "$pid" > /dev/null; then
+      kill "$pid"
+      echo "REST API server stopped"
+    else
+      echo "REST API is not running (stale PID file found, cleaning up)"
+    fi
+    rm -f "$PLUGIN_DATA_PATH/pid"
+  else
+    echo "REST API is not running"
+  fi
+}
+
+# Command routing
+case "$1" in
+  help)
+    cmd_help
+    ;;
+  rest-api:enable)
+    cmd_rest_api_enable
+    ;;
+  rest-api:disable)
+    cmd_rest_api_disable
+    ;;
+  rest-api:start)
+    cmd_rest_api_start
+    ;;
+  rest-api:stop)
+    cmd_rest_api_stop
+    ;;
+  rest-api:status)
+    cmd_rest_api_status
+    ;;
+  rest-api:set-port)
+    cmd_rest_api_set_port "$2"
+    ;;
+  rest-api:set-host)
+    cmd_rest_api_set_host "$2"
+    ;;
+  *)
+    exit "$DOKKU_NOT_IMPLEMENTED_EXIT"
+    ;;
+esac
