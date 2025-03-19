@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-# Ensure the log file exists with correct permissions
-if [ ! -f "/var/log/dokku-api.log" ]; then
-    touch /var/log/dokku-api.log
-    chown dokku:dokku /var/log/dokku-api.log
-fi
+# Create logs directory in dokku's home directory instead of /var/log
+DOKKU_LOG_DIR="/home/dokku/logs"
+mkdir -p $DOKKU_LOG_DIR
+touch $DOKKU_LOG_DIR/dokku-api.log
+chown -R dokku:dokku $DOKKU_LOG_DIR
 
-# Check if pip is installed, if not, install it
+# Check if pip is installed, if not, use sudo to install it
 if ! command -v pip3 &> /dev/null; then
-    apt-get update
-    apt-get install -y python3-pip
+    echo "pip3 not found, attempting to install..."
+    # This will need sudo, but fail gracefully if not available
+    if command -v sudo &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y python3-pip
+    else
+        echo "Warning: pip3 not found and sudo not available. Please install python3-pip manually."
+    fi
 fi
 
-# Install Flask
-python3 -m pip install -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt
+# Install Flask for the current user
+python3 -m pip install --user -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt

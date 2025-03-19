@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Handles `dokku api:*` commands
 
+DOKKU_LOG_DIR="/home/dokku/logs"
+LOG_FILE="$DOKKU_LOG_DIR/dokku-api.log"
+
 check_prerequisites() {
-  # Check if the pre-build script has been run
-  if [ ! -f "/var/log/dokku-api.log" ]; then
-    echo "Setting up dokku-api prerequisites..."
-    /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
-  fi
+  # Create logs directory if it doesn't exist
+  mkdir -p $DOKKU_LOG_DIR
+  touch $LOG_FILE 2>/dev/null || true
   
   # Check if Flask is installed
   if ! python3 -c "import flask" &> /dev/null; then
@@ -26,10 +27,10 @@ case "$1" in
     echo "API stopped"
     ;;
   api:logs)
-    if [ ! -f "/var/log/dokku-api.log" ]; then
+    if [ ! -f "$LOG_FILE" ]; then
       echo "Log file does not exist. Start the API first."
     else
-      tail -f /var/log/dokku-api.log
+      tail -f "$LOG_FILE"
     fi
     ;;
   api:setup)

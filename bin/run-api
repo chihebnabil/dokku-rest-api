@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 # Starts the Flask API in the background
-nohup python3 /var/lib/dokku/plugins/enabled/rest-api/src/app.py > /var/log/dokku-api.log 2>&1 &
+DOKKU_LOG_DIR="/home/dokku/logs"
+nohup python3 /var/lib/dokku/plugins/enabled/rest-api/src/app.py > $DOKKU_LOG_DIR/dokku-api.log 2>&1 &
