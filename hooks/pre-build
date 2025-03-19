@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Install Python dependencies
+python3 -m pip install -r /var/lib/dokku/plugins/dokku-api-plugin/src/requirements.txt

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Handles `dokku api:*` commands
+case "$1" in
+  api:start)
+    /var/lib/dokku/plugins/dokku-api-plugin/bin/run-api
+    echo "API started"
+    ;;
+  api:stop)
+    pkill -f "python3.*app.py"
+    echo "API stopped"
+    ;;
+  api:logs)
+    tail -f /var/log/dokku-api.log
+    ;;
+  *)
+    echo "Available commands: api:start, api:stop, api:logs"
+    ;;
+esac
