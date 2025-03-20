@@ -10,7 +10,13 @@ Install the Dokku REST API plugin:
 dokku plugin:install https://github.com/chihebnabil/dokku-rest-api
 ```
 
-then set the `DOKKU_API_KEY` in your environment
+You may need to install flask
+
+```bash
+sudo apt-get install -y python3-flask
+```
+
+Then set the `DOKKU_API_KEY` in your environment
 
 ```bash
 export DOKKU_API_KEY="your-super-secure-not-public-key"
