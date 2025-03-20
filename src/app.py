@@ -15,17 +15,24 @@ logging.basicConfig(level=logging.DEBUG)
 
 @app.before_request
 def check_auth():
-    # Log the request path for debugging
+    """Middleware to enforce API key authentication."""
     logging.debug(f"Checking auth for path: {request.path}")
 
-    # Skip authentication for explicitly public paths
-    if request.path.rstrip('/') in PUBLIC_PATHS or request.path.startswith("/static"):
+    # Allow public paths and static files
+    if request.path.rstrip("/") in PUBLIC_PATHS or request.path.startswith("/static"):
         logging.debug(f"Skipping auth for public path: {request.path}")
         return
 
-    # Ensure API key is provided and correct
-    if request.headers.get("X-API-Key") != API_KEY:
-        logging.warning(f"Unauthorized access attempt to path: {request.path}")
+    # Retrieve API Key from the headers
+    header_api_key = request.headers.get("X-API-Key", "").strip()
+    expected_api_key = (API_KEY or "").strip()
+
+    logging.debug(f"Received API Key: {header_api_key}")
+    logging.debug(f"Expected API Key: {expected_api_key}")
+
+    # Check if API Key is missing or incorrect
+    if not header_api_key or header_api_key != expected_api_key:
+        logging.warning(f"Unauthorized access attempt to {request.path}")
         return jsonify({"error": "Unauthorized"}), 401
 
 @app.route('/')
