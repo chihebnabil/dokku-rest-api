@@ -1,22 +1,35 @@
 #!/usr/bin/env bash
 set -e
 
-# Create logs directory in dokku's home directory instead of /var/log
+# Create logs directory in dokku's home directory
 DOKKU_LOG_DIR="/home/dokku/logs"
 mkdir -p $DOKKU_LOG_DIR
 touch $DOKKU_LOG_DIR/dokku-api.log
 chown -R dokku:dokku $DOKKU_LOG_DIR
 
-# Check if pip is installed, if not, use sudo to install it
-if ! command -v pip3 &> /dev/null; then
-    echo "pip3 not found, attempting to install..."
-    # This will need sudo, but fail gracefully if not available
-    if command -v sudo &> /dev/null; then
-        sudo apt-get update && sudo apt-get install -y python3-pip
+# Check if we're running as root
+if [ "$(id -u)" = "0" ]; then
+    # We're root, so we can install packages directly
+    apt-get update && apt-get install -y python3-pip python3-flask
+    
+    # Install requirements for all users
+    pip3 install -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt
+else
+    echo "Not running as root. Attempting to install dependencies locally..."
+    
+    # Try to install pip if not available
+    if ! command -v pip3 &> /dev/null; then
+        echo "Warning: pip3 not found. Please run this command as root or install python3-pip manually."
+        echo "You can install dependencies with: sudo apt-get install -y python3-pip python3-flask"
     else
-        echo "Warning: pip3 not found and sudo not available. Please install python3-pip manually."
+        # Install Flask locally for the current user if pip is available
+        pip3 install --user -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt
+        
+        if ! python3 -c "import flask" &> /dev/null; then
+            echo "Warning: Flask installation failed. Please install manually with:"
+            echo "pip3 install --user flask==3.0.0"
+        fi
     fi
 fi
 
-# Install Flask for the current user
-python3 -m pip install --user -r /var/lib/dokku/plugins/enabled/rest-api/src/requirements.txt
+echo "Pre-build setup completed."

@@ -11,16 +11,19 @@ check_prerequisites() {
   
   # Check if Flask is installed
   if ! python3 -c "import flask" &> /dev/null; then
-    echo "Installing Flask..."
-    /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
+    echo "Flask not found! Please install dependencies first:"
+    echo "Run 'dokku api:setup' as root or 'sudo apt-get install python3-pip python3-flask'"
+    exit 1
   fi
 }
 
 case "$1" in
   api:start)
     check_prerequisites
+    echo "Starting API server..."
     /var/lib/dokku/plugins/enabled/rest-api/bin/run-api
-    echo "API started"
+    echo "API started successfully."
+    echo "Test with: curl -H \"X-API-Key: \$DOKKU_API_KEY\" http://YOUR_SERVER_IP:5000/"
     ;;
   api:stop)
     pkill -f "python3.*app.py" || echo "API was not running"
@@ -34,11 +37,29 @@ case "$1" in
     fi
     ;;
   api:setup)
-    echo "Setting up dokku-api..."
+    echo "Setting up dokku-api dependencies..."
+    if [ "$(id -u)" != "0" ]; then
+      echo "This command requires root privileges."
+      echo "Please run with: sudo dokku api:setup"
+      exit 1
+    fi
     /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
     echo "Setup completed successfully"
     ;;
+  api:status)
+    if pgrep -f "python3.*app.py" > /dev/null; then
+      echo "API is running"
+      echo "API key environment variable is $(if [ -z "$DOKKU_API_KEY" ]; then echo "NOT "; fi)set"
+    else
+      echo "API is not running"
+    fi
+    ;;
   *)
-    echo "Available commands: api:start, api:stop, api:logs, api:setup"
+    echo "Available commands:"
+    echo "  api:setup  - Install required dependencies (requires root)"
+    echo "  api:start  - Start the API server"
+    echo "  api:stop   - Stop the API server"
+    echo "  api:logs   - View API logs"
+    echo "  api:status - Check API status"
     ;;
 esac

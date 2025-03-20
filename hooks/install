@@ -6,9 +6,17 @@ chmod +x /var/lib/dokku/plugins/enabled/rest-api/bin/run-api
 chmod +x /var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
 chmod +x /var/lib/dokku/plugins/enabled/rest-api/commands
 
-# Run the pre-build hook to set up dependencies
-/var/lib/dokku/plugins/enabled/rest-api/hooks/pre-build
-
 echo "Dokku REST API plugin installed successfully."
-echo "Set your API key with: export DOKKU_API_KEY=\"your-secure-key\""
-echo "Start the API with: dokku api:start"
+echo ""
+echo "IMPORTANT SETUP INSTRUCTIONS:"
+echo "============================="
+echo "1. Set your API key with: export DOKKU_API_KEY=\"your-secure-key\""
+echo ""
+echo "2. Install dependencies with ONE of these methods:"
+echo "   - As root user: dokku api:setup"
+echo "   - OR manually: sudo apt-get install python3-pip python3-flask"
+echo ""
+echo "3. Start the API with: dokku api:start"
+echo ""
+echo "4. Test with: curl -H \"X-API-Key: \$DOKKU_API_KEY\" http://YOUR_SERVER_IP:5000/"
+echo "============================="
