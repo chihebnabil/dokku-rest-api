@@ -6,11 +6,16 @@ import json
 app = Flask(__name__)
 API_KEY = os.getenv("DOKKU_API_KEY")  # Add security via API key
 
-# Basic authentication middleware
+# List of public paths
+PUBLIC_PATHS = ["/", "/health", "/docs"]
+
 @app.before_request
 def check_auth():
-    if request.path == '/':
-        return  # Skip auth for root path
+    # Skip authentication for explicitly public paths
+    if request.path in PUBLIC_PATHS or request.path.startswith("/static"):
+        return  
+    
+    # Ensure API key is provided and correct
     if request.headers.get("X-API-Key") != API_KEY:
         return jsonify({"error": "Unauthorized"}), 401
 
