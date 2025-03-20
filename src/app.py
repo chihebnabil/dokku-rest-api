@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import subprocess
 import os
 import json
+import logging
 
 app = Flask(__name__)
 API_KEY = os.getenv("DOKKU_API_KEY")  # Add security via API key
@@ -9,14 +10,22 @@ API_KEY = os.getenv("DOKKU_API_KEY")  # Add security via API key
 # List of public paths
 PUBLIC_PATHS = ["/", "/health", "/docs"]
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+
 @app.before_request
 def check_auth():
+    # Log the request path for debugging
+    logging.debug(f"Checking auth for path: {request.path}")
+
     # Skip authentication for explicitly public paths
-    if request.path in PUBLIC_PATHS or request.path.startswith("/static"):
-        return  
-    
+    if request.path.rstrip('/') in PUBLIC_PATHS or request.path.startswith("/static"):
+        logging.debug(f"Skipping auth for public path: {request.path}")
+        return
+
     # Ensure API key is provided and correct
     if request.headers.get("X-API-Key") != API_KEY:
+        logging.warning(f"Unauthorized access attempt to path: {request.path}")
         return jsonify({"error": "Unauthorized"}), 401
 
 @app.route('/')
