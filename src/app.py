@@ -10,8 +10,6 @@ API_KEY = os.getenv("DOKKU_API_KEY")  # Add security via API key
 # List of public paths
 PUBLIC_PATHS = ["/", "/health", "/docs"]
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
 
 @app.before_request
 def check_auth():
