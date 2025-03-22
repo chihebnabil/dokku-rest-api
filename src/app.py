@@ -13,9 +13,9 @@ app = Flask(__name__)
 
 # Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", str(uuid.uuid4()))
-TOKEN_EXPIRATION = int(os.getenv("TOKEN_EXPIRATION", "3600"))
-ADMIN_USERNAME = os.getenv("DOKKU_ADMIN_USERNAME")
-ADMIN_PASSWORD = os.getenv("DOKKU_ADMIN_PASSWORD")
+TOKEN_EXPIRATION = int(os.getenv("TOKEN_EXPIRATION", "3600"))  # 1 hour by default
+ADMIN_USERNAME = os.getenv("DOKKU_ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("DOKKU_ADMIN_PASSWORD", "pass")  # Default should be changed in production
 
 # Hash the admin password if it's stored in plaintext
 stored_password_hash = os.getenv("DOKKU_ADMIN_PASSWORD_HASH")
@@ -168,16 +168,70 @@ def refresh_token(current_user):
 @app.route('/apps', methods=['GET'])
 @token_required
 def list_apps(current_user):
-    """List all applications"""
+    """List all applications with their status"""
     try:
-        result = subprocess.run(
+        # Get list of all apps
+        apps_result = subprocess.run(
             ["dokku", "--quiet", "apps:list"],
             capture_output=True,
             text=True,
             check=True
         )
-        apps = [app for app in result.stdout.strip().split('\n') if app]
-        return jsonify({"apps": apps})
+        app_names = [app for app in apps_result.stdout.strip().split('\n') if app]
+        
+        # Initialize result with app details
+        apps_with_status = []
+        
+        # For each app, get its status information
+        for app_name in app_names:
+            app_info = {"name": app_name}
+            
+            try:
+                # Get deployment status
+                ps_result = subprocess.run(
+                    ["dokku", "--quiet", "ps:report", app_name],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if ps_result.returncode == 0:
+                    ps_output = ps_result.stdout.strip()
+                    
+                    # Extract status info
+                    status = "unknown"
+                    deploy_count = 0
+                    running = False
+                    
+                    for line in ps_output.split('\n'):
+                        if "Status" in line and ":" in line:
+                            status_value = line.split(':', 1)[1].strip()
+                            app_info["status"] = status_value
+                            running = "running" in status_value.lower()
+                        elif "Deployed" in line and ":" in line:
+                            app_info["deployed"] = "true" in line.split(':', 1)[1].strip().lower()
+                        elif "Restore" in line and ":" in line:
+                            app_info["restore"] = "true" in line.split(':', 1)[1].strip().lower()
+                    
+                    app_info["running"] = running
+                    
+                    # Get URL if available
+                    try:
+                        url_result = subprocess.run(
+                            ["dokku", "--quiet", "url", app_name],
+                            capture_output=True,
+                            text=True
+                        )
+                        if url_result.returncode == 0:
+                            app_info["url"] = url_result.stdout.strip()
+                    except:
+                        pass
+            except Exception as e:
+                logger.warning(f"Error getting status for app {app_name}: {str(e)}")
+                app_info["status_error"] = str(e)
+            
+            apps_with_status.append(app_info)
+            
+        return jsonify({"apps": apps_with_status})
     except subprocess.CalledProcessError as e:
         return jsonify({"error": str(e)}), 500
 
@@ -596,6 +650,10 @@ if __name__ == "__main__":
         print("PyJWT package is required. Install it with: pip install pyjwt")
         exit(1)
         
+    # Generate a warning if using default credentials
+    if ADMIN_USERNAME == "admin" and ADMIN_PASSWORD == "pass":
+        logger.warning("Using default admin credentials. This is insecure!")
+        logger.warning("Set DOKKU_ADMIN_USERNAME and DOKKU_ADMIN_PASSWORD environment variables")
     
     # Start the server
     port = int(os.environ.get("PORT", 5000))
