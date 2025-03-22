@@ -1,6 +1,6 @@
 [plugin]
 name = "dokku-rest-api"
 description = "REST API for Dokku that exposes app information"
-version = "0.1.1"
+version = "0.1.2"
 website_url = "https://github.com/chihebnabil/dokku-rest-api"
 [plugin.config]
