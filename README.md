@@ -1,4 +1,4 @@
-# Dokku REST Api
+# Dokku REST API
 
 This plugin provides a REST API for managing your Dokku instance. Below are the steps to install, configure, and use the plugin.
 
@@ -10,47 +10,69 @@ Install the Dokku REST API plugin:
 dokku plugin:install https://github.com/chihebnabil/dokku-rest-api
 ```
 
-You may need to install flask
+You may need to install Flask and PyJWT:
 
 ```bash
 sudo apt-get install -y python3-flask
-```
-
-Then set the `DOKKU_API_KEY` in your environment
-
-```bash
-export DOKKU_API_KEY="your-super-secure-not-public-key"
-```
-
-## Authentication
-
-All endpoints except the root endpoint (`/`) require authentication using an API key.
-
-```
-Header: X-API-Key: your-api-key
+pip install pyjwt
 ```
 
 ## Configuration
 
 The API can be configured using the following environment variables:
 
-- `DOKKU_API_KEY` - API authentication key (required)
-- `PORT` - Port to listen on (default: 5000)
-- `DEBUG` - Enable debug mode (default: False)
+- `JWT_SECRET_KEY` - Secret key for JWT token generation (default: auto-generated UUID).
+- `TOKEN_EXPIRATION` - Token expiration time in seconds (default: 3600 seconds / 1 hour).
+- `DOKKU_ADMIN_USERNAME` - Admin username for authentication (default: `admin`).
+- `DOKKU_ADMIN_PASSWORD` - Admin password for authentication (default: `pass`). **Change this in production!**
+- `DOKKU_ADMIN_PASSWORD_HASH` - SHA-256 hash of the admin password (optional, will be auto-generated if not provided).
+- `PORT` - Port to listen on (default: 5000).
+- `DEBUG` - Enable debug mode (default: False).
 
+## Authentication
 
-Test the API by sending a request to the Dokku server. 
-Replace YOUR_DOKKU_IP_ADD with your Dokku server's IP address:
+All endpoints except the following public paths require authentication using a JWT token:
+
+- `/` - Welcome message.
+- `/health` - Health check.
+- `/docs` - API documentation.
+- `/login` - Login endpoint to obtain a JWT token.
+
+To authenticate, include the JWT token in the `Authorization` header:
+
+```plaintext
+Authorization: Bearer <your-jwt-token>
+```
+
+### Login Endpoint
+
+To obtain a JWT token, send a POST request to `/login` with the admin credentials:
 
 ```bash
-curl -H "X-API-Key: $DOKKU_API_KEY" http://YOUR_DOKKU_IP_ADD:5000/
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"username": "admin", "password": "your-password"}' \
+     http://your-server:5000/login
+```
+
+#### Response:
+
+```json
+{
+  "token": "<jwt-token>",
+  "expires_at": "<expiration-time>",
+  "token_type": "Bearer"
+}
 ```
 
 ## Usage
 
+Start the API server:
+
 ```bash
 dokku api:start
 ```
+
+Stop the API server:
 
 ```bash
 dokku api:stop
@@ -58,71 +80,80 @@ dokku api:stop
 
 ## Endpoints
 
-### Base
+### Base Endpoints
 
-| Method | Endpoint | Description |
+| Method | Endpoint  | Description |
 |--------|----------|-------------|
-| GET | `/` | Welcome message, no authentication required |
+| GET    | `/`      | Welcome message, no authentication required |
+| GET    | `/health`| Health check, no authentication required |
+| GET    | `/docs`  | API documentation, no authentication required |
+
+### Authentication Endpoints
+
+| Method | Endpoint  | Description |
+|--------|----------|-------------|
+| POST   | `/login` | Authenticate and obtain a JWT token |
+| GET    | `/token/validate` | Validate a JWT token (requires authentication) |
+| POST   | `/token/refresh`  | Refresh a valid JWT token (requires authentication) |
 
 ### Application Management
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/apps` | List all applications |
-| POST | `/apps` | Create a new application (Requires JSON body: `{"name": "app-name"}`) |
-| GET | `/apps/<app_name>` | Get application details including URL and status |
+|--------|---------|-------------|
+| GET    | `/apps` | List all applications |
+| POST   | `/apps` | Create a new application (Requires JSON body: `{"name": "app-name"}`) |
+| GET    | `/apps/<app_name>` | Get application details including URL and status |
 | DELETE | `/apps/<app_name>` | Delete an application |
-| POST | `/apps/<app_name>/restart` | Restart an application |
-| GET | `/apps/<app_name>/logs` | Get application logs (Optional query param: `lines=100`) |
+| POST   | `/apps/<app_name>/restart` | Restart an application |
 
 ### Environment Variable Management
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/apps/<app_name>/env` | Get all environment variables for an application |
-| POST | `/apps/<app_name>/env` | Set environment variables (Requires JSON body: `{"KEY1": "value1", "KEY2": "value2"}`) |
+|--------|---------|-------------|
+| GET    | `/apps/<app_name>/env` | Get all environment variables for an application |
+| POST   | `/apps/<app_name>/env` | Set environment variables (Requires JSON body: `{"KEY1": "value1", "KEY2": "value2"}`) |
 | DELETE | `/apps/<app_name>/env/<env_name>` | Unset a specific environment variable |
 
 ### Domain Management
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/apps/<app_name>/domains` | Get domains for an application |
-| POST | `/apps/<app_name>/domains` | Add a domain (Requires JSON body: `{"domain": "example.com"}`) |
+|--------|---------|-------------|
+| GET    | `/apps/<app_name>/domains` | Get domains for an application |
+| POST   | `/apps/<app_name>/domains` | Add a domain (Requires JSON body: `{"domain": "example.com"}`) |
 | DELETE | `/apps/<app_name>/domains/<domain>` | Remove a domain from an application |
 
 ### Proxy Management
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/proxy/<app_name>` | Get proxy status and configuration for an application |
-| PUT | `/proxy/<app_name>` | Enable or disable proxy (Requires JSON body: `{"enabled": true}`) |
+|--------|---------|-------------|
+| GET    | `/proxy/<app_name>` | Get proxy status and configuration for an application |
+| PUT    | `/proxy/<app_name>` | Enable or disable proxy (Requires JSON body: `{"enabled": true}`) |
 
 ### Plugin Management
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/plugins` | List all installed plugins |
+|--------|---------|-------------|
+| GET    | `/plugins` | List all installed plugins |
 
 ### System Information
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/system/version` | Get Dokku version |
-| GET | `/system/report` | Get system report including scheduler information |
+|--------|---------|-------------|
+| GET    | `/system/version` | Get Dokku version |
+| GET    | `/system/report` | Get system report including scheduler information |
 
 ## Examples
 
 ### List all applications
 
 ```bash
-curl -H "X-API-Key: your-api-key" http://your-server:5000/apps
+curl -H "Authorization: Bearer <your-jwt-token>" http://your-server:5000/apps
 ```
 
 ### Create a new application
 
 ```bash
-curl -X POST -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
+curl -X POST -H "Authorization: Bearer <your-jwt-token>" -H "Content-Type: application/json" \
      -d '{"name":"my-new-app"}' \
      http://your-server:5000/apps
 ```
@@ -130,7 +161,7 @@ curl -X POST -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
 ### Set environment variables
 
 ```bash
-curl -X POST -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
+curl -X POST -H "Authorization: Bearer <your-jwt-token>" -H "Content-Type: application/json" \
      -d '{"DATABASE_URL":"postgres://user:pass@host:5432/db", "NODE_ENV":"production"}' \
      http://your-server:5000/apps/my-app/env
 ```
@@ -138,7 +169,7 @@ curl -X POST -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
 ### Enable proxy for an application
 
 ```bash
-curl -X PUT -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
+curl -X PUT -H "Authorization: Bearer <your-jwt-token>" -H "Content-Type: application/json" \
      -d '{"enabled":true}' \
      http://your-server:5000/proxy/my-app
 ```
